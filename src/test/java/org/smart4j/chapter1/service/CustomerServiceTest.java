@@ -3,6 +3,7 @@ package org.smart4j.chapter1.service;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.smart4j.chapter1.help.DatabaseHelper;
 import org.smart4j.chapter1.model.Customer;
 
 import java.util.HashMap;
@@ -24,7 +25,7 @@ public class CustomerServiceTest {
     }
     @Before
     public void init(){
-
+        DatabaseHelper.executeSqlFile("sql/customer_init.sql");
     }
     @Test
     public void getCustomerListTest() throws Exception {

@@ -1,6 +1,7 @@
 package org.smart4j.chapter1.help;
 
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.dbutils.QueryRunner;
 import org.apache.commons.dbutils.handlers.BeanHandler;
 import org.apache.commons.dbutils.handlers.BeanListHandler;
@@ -12,7 +13,6 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,25 +26,30 @@ import java.util.Properties;
  */
 @Slf4j
 public class DatabaseHelper {
-    private static final String DRIVER;
-    private static final String URL;
-    private static final String USERNAME;
-    private static final String PASSWORD;
+
     private static final QueryRunner QUERY_RUNNER;
     private static final ThreadLocal<Connection> CONNECTION_HOLDER;
+    private static final BasicDataSource DATA_SOURCE;
 
     static {
         QUERY_RUNNER = new QueryRunner();
         CONNECTION_HOLDER = new ThreadLocal<>();
-        Properties properties = PropsUtil.loadProps("config.properties");
-        DRIVER = properties.getProperty("jdbc.driver");
-        URL = properties.getProperty("jdbc.url");
-        USERNAME = properties.getProperty("jdbc.username");
-        PASSWORD = properties.getProperty("jdbc.password");
 
+        Properties properties = PropsUtil.loadProps("config.properties");
         log.info("properties = [{}]", properties.toString());
+        String driver = properties.getProperty("jdbc.driver");
+        String url = properties.getProperty("jdbc.url");
+        String username = properties.getProperty("jdbc.username");
+        String password = properties.getProperty("jdbc.password");
+
+        DATA_SOURCE = new BasicDataSource();
+        DATA_SOURCE.setDriverClassName(driver);
+        DATA_SOURCE.setUrl(url);
+        DATA_SOURCE.setUsername(username);
+        DATA_SOURCE.setPassword(password);
+
         try {
-            Class.forName(DRIVER);
+            Class.forName(driver);
         } catch (ClassNotFoundException e) {
             log.error("can not load jdbc driver", e);
         }
@@ -55,11 +60,11 @@ public class DatabaseHelper {
      *
      * @return
      */
-    public static Connection getConnection() {
+    private static Connection getConnection() {
         Connection connection = CONNECTION_HOLDER.get();
         if (connection == null) {
             try {
-                connection = DriverManager.getConnection(URL, USERNAME, PASSWORD);
+                connection = DATA_SOURCE.getConnection();
             } catch (SQLException e) {
                 log.error("get connection failure", e);
             } finally {
@@ -69,7 +74,7 @@ public class DatabaseHelper {
         return connection;
     }
 
-    public static void closeConnection() {
+    private static void closeConnection() {
         Connection connection = CONNECTION_HOLDER.get();
         if (connection != null) {
             try {
@@ -104,8 +109,8 @@ public class DatabaseHelper {
     /**
      * 执行更新语句（包括：update、insert、delete）
      */
-    public static int executeUpdate(String sql, Object... params) {
-        int rows = 0;
+    private static int executeUpdate(String sql, Object... params) {
+        int rows;
         try {
             Connection conn = getConnection();
             rows = QUERY_RUNNER.update(conn, sql, params);
@@ -195,7 +200,7 @@ public class DatabaseHelper {
         }
         sql += columns.substring(0, columns.lastIndexOf(", ")) + " WHERE id = ?";
 
-        List<Object> paramList = new ArrayList<Object>();
+        List<Object> paramList = new ArrayList<>();
         paramList.addAll(fieldMap.values());
         paramList.add(id);
         Object[] params = paramList.toArray();
